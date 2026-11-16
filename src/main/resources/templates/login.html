@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in · S3 Outposts Client</title>
+  <link rel="stylesheet" th:href="@{/webjars/bootstrap/dist/css/bootstrap.min.css}">
+  <link rel="stylesheet" th:href="@{/webjars/bootstrap-icons/font/bootstrap-icons.min.css}">
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body class="bg-body-tertiary">
+<main class="d-flex align-items-center justify-content-center min-vh-100 p-3">
+  <div class="card border-0 shadow-sm login-card">
+    <div class="card-body p-4 p-sm-5">
+      <h1 class="h5 d-flex align-items-center gap-2 mb-1 fw-semibold">
+        <i class="bi bi-hdd-stack text-primary" aria-hidden="true"></i>S3 Outposts Client
+      </h1>
+      <p class="text-secondary small mb-4">Sign in to continue</p>
+      <form th:action="@{/login}" method="post">
+        <div class="mb-3">
+          <label for="username" class="form-label small text-secondary">Username</label>
+          <input type="text" id="username" name="username" class="form-control" autocomplete="username" required autofocus>
+        </div>
+        <div class="mb-4">
+          <label for="password" class="form-label small text-secondary">Password</label>
+          <input type="password" id="password" name="password" class="form-control" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">Sign in</button>
+        <div th:if="${param.error}" class="alert alert-danger small py-2 mt-3 mb-0" role="alert">Wrong username or password.</div>
+        <div th:if="${param.logout}" class="alert alert-success small py-2 mt-3 mb-0" role="status">You are signed out.</div>
+      </form>
+    </div>
+  </div>
+</main>
+</body>
+</html>

@@ -1,0 +1,160 @@
+:root {
+  --sidebar-width: 264px;
+  --detail-width: 340px;
+}
+
+body {
+  font-size: .875rem;
+}
+
+.app-grid {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr) var(--detail-width);
+  height: 100vh;
+}
+
+.app-grid > * {
+  min-height: 0;
+  min-width: 0;
+}
+
+.min-w-0 {
+  min-width: 0;
+}
+
+.section-label {
+  font-size: .6875rem;
+  letter-spacing: .06em;
+}
+
+.sidebar .nav-link {
+  color: var(--bs-body-color);
+  border-radius: .375rem;
+  padding: .45rem .75rem;
+}
+
+.sidebar .nav-link:hover {
+  background-color: var(--bs-secondary-bg);
+}
+
+.sidebar .nav-link.active {
+  background-color: var(--bs-primary-bg-subtle);
+  color: var(--bs-primary-text-emphasis);
+  font-weight: 600;
+}
+
+.sidebar .nav-link.disabled {
+  color: var(--bs-secondary-color);
+}
+
+.objects thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background-color: var(--bs-body-bg);
+  color: var(--bs-secondary-color);
+  font-size: .75rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.objects td a {
+  text-decoration: none;
+}
+
+.objects tr.is-selected > td {
+  background-color: var(--bs-primary-bg-subtle);
+}
+
+.version-row > td {
+  background-color: var(--bs-tertiary-bg);
+}
+
+.meta-list {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: .35rem 1rem;
+  margin: 0;
+}
+
+.meta-list dt {
+  color: var(--bs-secondary-color);
+  font-weight: 500;
+}
+
+.meta-list dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.meta-list-stacked {
+  grid-template-columns: minmax(0, 1fr);
+  gap: .1rem;
+}
+
+.meta-list-stacked dd {
+  margin-bottom: .5rem;
+}
+
+.detail-page {
+  max-width: 760px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 380px;
+}
+
+.loading-bar {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 1080;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--bs-primary), transparent) no-repeat;
+  background-size: 40% 100%;
+  animation: loading-slide 1s linear infinite;
+}
+
+@keyframes loading-slide {
+  from {
+    background-position: -40% 0;
+  }
+  to {
+    background-position: 140% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-bar {
+    animation: none;
+    background: var(--bs-primary);
+  }
+}
+
+/* Narrower screens: details open as their own page, then the sidebar moves above the list. */
+@media (max-width: 1199.98px) {
+  .app-grid {
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  }
+
+  .detail {
+    display: none;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .app-grid {
+    display: block;
+    height: auto;
+  }
+
+  .sidebar {
+    border-right: 0 !important;
+    border-bottom: var(--bs-border-width) solid var(--bs-border-color);
+  }
+
+  .sidebar .nav {
+    max-height: 30vh;
+  }
+}

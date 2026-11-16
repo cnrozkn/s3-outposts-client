@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="_csrf" th:content="${_csrf.token}">
+  <meta name="_csrf_header" th:content="${_csrf.headerName}">
+  <title th:text="${detail.key()} + ' · S3 Outposts Client'">Object · S3 Outposts Client</title>
+  <link rel="stylesheet" th:href="@{/webjars/bootstrap/dist/css/bootstrap.min.css}">
+  <link rel="stylesheet" th:href="@{/webjars/bootstrap-icons/font/bootstrap-icons.min.css}">
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+  <script th:src="@{/js/app.js}" defer></script>
+</head>
+<body class="bg-body-tertiary">
+<div id="loading" class="loading-bar" hidden></div>
+<main class="container py-4 detail-page">
+  <a th:if="${bucket.allows('LIST')}" class="small d-inline-flex align-items-center gap-1 mb-3 text-decoration-none" data-nav
+     th:href="@{/buckets/{name}(name=${bucket.name()},prefix=${folder})}">
+    <i class="bi bi-arrow-left" aria-hidden="true"></i><span th:text="${bucket.name()} + ' / ' + ${folder}">bucket / folder</span>
+  </a>
+  <div class="card border-0 shadow-sm">
+    <!--/* The side panel of the listing page shows this element. */-->
+    <div id="meta" class="p-4" th:with="name=${detail.key().substring(detail.key().lastIndexOf('/') + 1)}">
+      <div class="d-flex align-items-start gap-2 mb-3">
+        <i class="bi bi-file-earmark fs-4 text-secondary" aria-hidden="true"></i>
+        <div class="text-break">
+          <h2 class="h6 mb-1" th:text="${name.isEmpty() ? '(empty name)' : name}">name</h2>
+          <div class="small text-secondary font-monospace" th:unless="${name == detail.key()}" th:text="${detail.key()}">key</div>
+        </div>
+      </div>
+      <div class="d-flex flex-wrap gap-2 mb-4">
+        <a th:if="${bucket.allows('DOWNLOAD')}" class="btn btn-sm btn-primary"
+           th:href="@{/buckets/{name}/download(name=${bucket.name()},key=${detail.key()})}"><i
+            class="bi bi-download me-1" aria-hidden="true"></i>Download</a>
+        <a th:if="${previewable}" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener"
+           th:href="@{/buckets/{name}/preview(name=${bucket.name()},key=${detail.key()})}"><i
+            class="bi bi-eye me-1" aria-hidden="true"></i>Preview</a>
+        <button th:if="${bucket.allows('UPLOAD')}" type="button" class="btn btn-sm btn-outline-secondary"
+                th:data-upload="${detail.key()}"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Replace</button>
+        <button th:if="${bucket.canRename()}" type="button" class="btn btn-sm btn-outline-secondary"
+                th:data-rename="${detail.key()}"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Rename</button>
+        <button th:if="${bucket.allows('DELETE')}" type="button" class="btn btn-sm btn-outline-danger"
+                th:data-delete="${detail.key()}"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
+      </div>
+      <h3 class="section-label text-uppercase text-secondary fw-semibold mb-2">Properties</h3>
+      <dl class="meta-list mb-4">
+        <dt>Size</dt>
+        <dd th:text="${@sizes.format(detail.size())}">1 KB</dd>
+        <dt>Content type</dt>
+        <dd th:text="${detail.contentType()}">type</dd>
+        <dt>ETag</dt>
+        <dd class="font-monospace" th:text="${detail.eTag()}">etag</dd>
+        <dt>Last modified</dt>
+        <dd th:text="${#temporals.format(detail.lastModified(), 'yyyy-MM-dd HH:mm:ss')}">2026-01-01 00:00:00</dd>
+      </dl>
+      <th:block th:unless="${detail.metadata().isEmpty()}">
+        <h3 class="section-label text-uppercase text-secondary fw-semibold mb-2">Metadata</h3>
+        <dl class="meta-list meta-list-stacked mb-0">
+          <th:block th:each="entry : ${detail.metadata()}">
+            <dt th:text="${entry.key}">key</dt>
+            <dd th:text="${entry.value}">value</dd>
+          </th:block>
+        </dl>
+      </th:block>
+    </div>
+  </div>
+  <th:block th:replace="~{fragments :: writeActions(${bucket}, ${folder})}"></th:block>
+</main>
+</body>
+</html>

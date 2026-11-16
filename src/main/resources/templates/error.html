@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title th:text="${status} + ' · S3 Outposts Client'">Error · S3 Outposts Client</title>
+  <link rel="stylesheet" th:href="@{/webjars/bootstrap/dist/css/bootstrap.min.css}">
+  <link rel="stylesheet" th:href="@{/webjars/bootstrap-icons/font/bootstrap-icons.min.css}">
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body class="bg-body-tertiary">
+<main class="container py-4 detail-page">
+  <div class="card border-0 shadow-sm">
+    <!--/* Also shown in the side panel when loading a detail fails. */-->
+    <div id="meta" class="p-4">
+      <div class="d-flex align-items-start gap-2">
+        <i class="bi bi-exclamation-triangle fs-4 text-warning" aria-hidden="true"></i>
+        <div>
+          <h2 class="h6 mb-1" th:text="${status} + ' ' + ${error}">Error</h2>
+          <p class="small mb-1" th:if="${message != null and !message.isEmpty() and message != 'No message available'}"
+             th:text="${message}">Message</p>
+          <p class="small text-secondary mb-0" th:switch="${status}">
+            <span th:case="504">S3 did not answer in time. For a very large folder, narrow the listing with a prefix
+              search and try again.</span>
+            <span th:case="502">The S3 request failed. The application log has the details.</span>
+            <span th:case="404">Nothing was found here.</span>
+            <span th:case="403">This action is turned off for the bucket, or S3 denied it.</span>
+            <span th:case="409">An object with this key already exists.</span>
+            <span th:case="413">The object is larger than the configured limit.</span>
+            <span th:case="416">The requested byte range is outside the object.</span>
+            <span th:case="*">Something went wrong.</span>
+          </p>
+        </div>
+      </div>
+      <a class="btn btn-sm btn-outline-secondary mt-3" th:href="@{/}">Buckets</a>
+    </div>
+  </div>
+</main>
+</body>
+</html>

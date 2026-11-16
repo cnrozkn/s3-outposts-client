@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Versions</title>
+</head>
+<body>
+<!--/* Rows the listing page inserts under a file row. */-->
+<table>
+  <tbody id="versions">
+  <tr th:if="${denied}" class="version-row">
+    <td class="ps-5 pe-4 small text-secondary" colspan="4">S3 denied listing versions in this bucket.</td>
+  </tr>
+  <th:block th:unless="${denied}">
+    <tr th:if="${list.versions().size() <= 1}" class="version-row">
+      <td class="ps-5 pe-4 small text-secondary" colspan="4">No other versions.</td>
+    </tr>
+    <th:block th:if="${list.versions().size() > 1}">
+      <tr th:each="version : ${list.versions()}" class="version-row">
+        <td class="ps-5 small text-break">
+          <i class="bi bi-clock-history text-secondary me-2" aria-hidden="true"></i><span class="font-monospace"
+            th:text="${version.versionId()}">version</span>
+          <span th:if="${version.latest()}" class="badge rounded-pill text-bg-primary ms-1">latest</span>
+          <span th:if="${version.deleteMarker()}" class="badge rounded-pill text-bg-secondary ms-1">delete marker</span>
+        </td>
+        <td class="text-end text-nowrap small" th:text="${version.deleteMarker() ? '' : @sizes.format(version.size())}">1 KB</td>
+        <td class="text-nowrap small d-none d-md-table-cell"
+            th:text="${#temporals.format(version.lastModified(), 'yyyy-MM-dd HH:mm:ss')}">2026-01-01 00:00:00</td>
+        <td class="pe-4 text-end">
+          <a th:if="${!version.deleteMarker() and bucket.allows('DOWNLOAD')}" class="btn btn-link btn-sm text-secondary px-1"
+             title="Download this version" aria-label="Download this version"
+             th:href="@{/buckets/{name}/download(name=${bucket.name()},key=${key},version=${version.versionId()})}"><i
+              class="bi bi-download" aria-hidden="true"></i></a>
+        </td>
+      </tr>
+      <tr th:if="${list.truncated()}" class="version-row">
+        <td class="ps-5 pe-4 small text-secondary" colspan="4"
+            th:text="|Showing the newest ${list.versions().size()} versions; older ones exist.|">Older versions exist.</td>
+      </tr>
+    </th:block>
+  </th:block>
+  </tbody>
+</table>
+</body>
+</html>

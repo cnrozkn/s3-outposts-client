@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<body>
+<!--/* Hidden forms and settings the write buttons use; rendered only for buckets that allow writes. */-->
+<th:block th:fragment="writeActions(bucket, prefix)">
+  <th:block th:if="${bucket.writable()}">
+    <div id="actions" hidden
+         th:data-upload-url="@{/buckets/{name}/upload(name=${bucket.name()})}"
+         th:data-exists-url="@{/buckets/{name}/exists(name=${bucket.name()})}"
+         th:data-prefix="${prefix}"
+         th:data-max-size="${uploadMaxSize}"></div>
+    <input th:if="${bucket.allows('UPLOAD')}" type="file" id="upload-input" hidden multiple>
+    <form th:if="${bucket.allows('DELETE')}" id="delete-form" method="post" hidden
+          th:action="@{/buckets/{name}/delete(name=${bucket.name()})}">
+      <input type="hidden" name="key">
+      <input type="hidden" name="prefix" th:value="${prefix}">
+    </form>
+    <form th:if="${bucket.canRename()}" id="rename-form" method="post" hidden
+          th:action="@{/buckets/{name}/rename(name=${bucket.name()})}">
+      <input type="hidden" name="key">
+      <input type="hidden" name="target">
+      <input type="hidden" name="overwrite" value="false">
+    </form>
+  </th:block>
+</th:block>
+</body>
+</html>

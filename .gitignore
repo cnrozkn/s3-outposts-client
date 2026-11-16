@@ -1,0 +1,15 @@
+target/
+
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+.factorypath
+
+.DS_Store
+
+# Local configuration with real bucket aliases or credentials
+application-local.yml
+*.env

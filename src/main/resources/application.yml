@@ -1,0 +1,44 @@
+spring:
+  application:
+    name: s3-outposts-client
+  security:
+    user:
+      # Required; the application does not start without them.
+      name: ${S3CLIENT_USERNAME}
+      password: ${S3CLIENT_PASSWORD}
+  threads:
+    virtual:
+      enabled: true
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          max-age: 7d
+      chain:
+        strategy:
+          content:
+            enabled: true
+            paths: /css/**,/js/**
+
+server:
+  # Page tokens travel in the URL; deep paging through a large folder needs more than the 8 KB default.
+  max-http-request-header-size: 64KB
+  compression:
+    enabled: true
+  error:
+    include-message: always
+
+management:
+  server:
+    port: 8081
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
