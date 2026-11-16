@@ -41,6 +41,11 @@ class OutpostsAddressingTest {
     private static final String OUTPOST_ID = "00000000000000000";
     private static final String ALIAS = "test-ap-o" + OUTPOST_ID + "abcdefghijklmnopqrstuvwxy--op-s3";
     private static final String HOST = ALIAS + ".op-" + OUTPOST_ID + ".s3-outposts.eu-west-1.amazonaws.com";
+    private static final String ACCOUNT = "000000000000";
+    private static final String ARN =
+            "arn:aws:s3-outposts:eu-west-1:" + ACCOUNT + ":outpost/op-" + OUTPOST_ID + "/accesspoint/test-ap";
+    private static final String ARN_HOST =
+            "test-ap-" + ACCOUNT + ".op-" + OUTPOST_ID + ".s3-outposts.eu-west-1.amazonaws.com";
     private static final String SIGNING_SCOPE = "/eu-west-1/s3-outposts/aws4_request";
 
     private final CapturingHttpClient http = new CapturingHttpClient();
@@ -68,6 +73,21 @@ class OutpostsAddressingTest {
         }
 
         assertThat(http.last().host()).isEqualTo(HOST);
+        assertThat(http.last().firstMatchingHeader("Authorization"))
+                .hasValueSatisfying(value -> assertThat(value).contains(SIGNING_SCOPE));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "https://s3-outposts.eu-west-1.amazonaws.com"})
+    void anAccessPointArnWorksLikeTheAlias(String endpoint) {
+        http.respond("<ListBucketResult xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">"
+                + "<IsTruncated>false</IsTruncated></ListBucketResult>");
+        try (S3Client s3 = client(endpoint)) {
+            s3.listObjectsV2(
+                    ListObjectsV2Request.builder().bucket(ARN).prefix("docs/").build());
+        }
+
+        assertThat(http.last().host()).isEqualTo(ARN_HOST);
         assertThat(http.last().firstMatchingHeader("Authorization"))
                 .hasValueSatisfying(value -> assertThat(value).contains(SIGNING_SCOPE));
     }

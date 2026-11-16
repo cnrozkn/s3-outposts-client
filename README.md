@@ -48,13 +48,18 @@ docker run --rm -p 8080:8080 \
 
 Then open <http://localhost:8080>.
 
+Run a single instance. The login session and the CSRF token are kept in memory, so with more than one replica,
+requests that reach another replica are sent back to the login page and uploads fail with 403. If you need
+several replicas, turn on sticky sessions, for example `sessionAffinity: ClientIP` on a Kubernetes Service or
+cookie affinity on the ingress.
+
 ## Configuration
 
 Every setting is an environment variable or a key under `s3-client` in a YAML file.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `S3CLIENT_USERNAME`, `S3CLIENT_PASSWORD` | required | The login. The app does not start without them. |
+| `S3CLIENT_USERNAME`, `S3CLIENT_PASSWORD` | required | The login. The app does not start without them, or with a password shorter than 16 characters. |
 | `S3CLIENT_BUCKETS_<n>_NAME` | required | Short name used in URLs: letters, digits, `.`, `_`, `-`. |
 | `S3CLIENT_BUCKETS_<n>_ALIAS` | required | Access point alias (`…--op-s3`) or access point ARN. |
 | `S3CLIENT_BUCKETS_<n>_CAPABILITIES` | `LIST,DETAIL,DOWNLOAD,PREVIEW,VERSIONS` | Allowed operations, comma-separated. Add `UPLOAD` (upload, replace, create folder) and `DELETE` to allow writes. Rename needs both. |
@@ -63,7 +68,7 @@ Every setting is an environment variable or a key under `s3-client` in a YAML fi
 | `S3CLIENT_PAGE_SIZE` | `100` | Entries per page, 1 to 1000. |
 | `S3CLIENT_PREVIEW_MAX_SIZE` | `5MB` | Largest object the preview opens. |
 | `S3CLIENT_UPLOAD_MAX_SIZE` | `5GB` | Largest upload; 5 GB is the single PUT limit. |
-| `S3CLIENT_WRITE_TIMEOUT` | `30m` | Time limit for one upload, copy or delete call. |
+| `S3CLIENT_WRITE_TIMEOUT` | `2h` | Time limit for one upload, copy or delete call. A 5 GB upload over a slow link needs most of it. |
 | `S3CLIENT_LIST_CACHE_TTL` | `30s` | How long a listing page is reused. `0` turns the cache off. |
 | `LOGGING_STRUCTURED_FORMAT_CONSOLE` | plain text | `ecs` or `logstash` for JSON logs. |
 | `TZ` | `UTC` in the container | Time zone of the timestamps in the UI. |
@@ -205,7 +210,7 @@ Java 21 is the only requirement; the Maven wrapper downloads Maven.
 ```
 
 ```bash
-S3CLIENT_USERNAME=admin S3CLIENT_PASSWORD=change-me S3CLIENT_REGION=<region> \
+S3CLIENT_USERNAME=admin S3CLIENT_PASSWORD='<at least 16 characters>' S3CLIENT_REGION=<region> \
   S3CLIENT_BUCKETS_0_NAME=logs S3CLIENT_BUCKETS_0_ALIAS='<access point alias>' \
   ./mvnw spring-boot:run
 ```

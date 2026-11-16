@@ -1,12 +1,15 @@
 package io.github.cnrozkn.s3client;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.boot.test.web.server.LocalManagementPort;
@@ -17,7 +20,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
         webEnvironment = WebEnvironment.RANDOM_PORT,
         properties = {
             "S3CLIENT_USERNAME=admin",
-            "S3CLIENT_PASSWORD=secret",
+            "S3CLIENT_PASSWORD=test-password-0123",
             "management.server.port=0",
             "s3-client.region=eu-west-1",
             "s3-client.buckets[0].name=data",
@@ -67,5 +70,21 @@ class ServerTest {
         assertThat(response.statusCode()).isEqualTo(302);
         assertThat(response.headers().firstValue("Location"))
                 .hasValueSatisfying(value -> assertThat(value).endsWith("/login"));
+    }
+
+    @Test
+    void aShortPasswordStopsTheStart() {
+        SpringApplication app = new SpringApplicationBuilder(S3OutpostsClientApplication.class)
+                .properties(
+                        "S3CLIENT_USERNAME=admin",
+                        "S3CLIENT_PASSWORD=short",
+                        "server.port=0",
+                        "management.server.port=0",
+                        "s3-client.region=eu-west-1",
+                        "s3-client.buckets[0].name=data",
+                        "s3-client.buckets[0].alias=data--op-s3")
+                .build();
+
+        assertThatThrownBy(app::run).hasRootCauseMessage("S3CLIENT_PASSWORD must have at least 16 characters");
     }
 }

@@ -33,7 +33,7 @@ public record ClientProperties(
         @DefaultValue("100") int pageSize,
         @DefaultValue("5MB") DataSize previewMaxSize,
         @DefaultValue("5GB") DataSize uploadMaxSize,
-        @DefaultValue("30m") Duration writeTimeout,
+        @DefaultValue("2h") Duration writeTimeout,
         @DefaultValue("30s") Duration listCacheTtl,
         List<Bucket> buckets) {
 

@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -29,6 +30,7 @@ public class WriteController {
 
     private static final Logger audit = LoggerFactory.getLogger("s3client.audit");
     private static final int MAX_KEY_BYTES = 1024;
+    private static final Pattern LINE_BREAKS = Pattern.compile("[\\p{Cc}\\p{Zl}\\p{Zp}]");
 
     private final BucketStorage storage;
     private final ClientProperties properties;
@@ -80,7 +82,7 @@ public class WriteController {
                 "action=upload user={} bucket={} key={} size={} overwrite={}",
                 principal.getName(),
                 bucket.name(),
-                key,
+                logged(key),
                 length,
                 overwrite);
         return ResponseEntity.noContent().build();
@@ -100,7 +102,7 @@ public class WriteController {
         String key = prefix + folder + "/";
         checkKey(key);
         storage.createFolder(bucket.alias(), key);
-        audit.info("action=create-folder user={} bucket={} key={}", principal.getName(), bucket.name(), key);
+        audit.info("action=create-folder user={} bucket={} key={}", principal.getName(), bucket.name(), logged(key));
         redirect.addFlashAttribute("message", "Created folder " + folder);
         redirect.addAttribute("prefix", prefix);
         return "redirect:/buckets/{name}";
@@ -131,8 +133,8 @@ public class WriteController {
                 "action=rename user={} bucket={} key={} target={} overwrite={}",
                 principal.getName(),
                 bucket.name(),
-                key,
-                target,
+                logged(key),
+                logged(target),
                 overwrite);
         redirect.addFlashAttribute("message", "Renamed " + key + " to " + target);
         redirect.addAttribute("prefix", target.substring(0, target.lastIndexOf('/') + 1));
@@ -149,10 +151,15 @@ public class WriteController {
         Bucket bucket = Access.require(properties, name, Capability.DELETE);
         checkKey(key);
         storage.delete(bucket.alias(), key);
-        audit.info("action=delete user={} bucket={} key={}", principal.getName(), bucket.name(), key);
+        audit.info("action=delete user={} bucket={} key={}", principal.getName(), bucket.name(), logged(key));
         redirect.addFlashAttribute("message", "Deleted " + key);
         redirect.addAttribute("prefix", prefix);
         return "redirect:/buckets/{name}";
+    }
+
+    /** Keys may contain line breaks; logged as they are, one key could add fake lines to the audit log. */
+    private static String logged(String key) {
+        return LINE_BREAKS.matcher(key).replaceAll("_");
     }
 
     private static void checkKey(String key) {

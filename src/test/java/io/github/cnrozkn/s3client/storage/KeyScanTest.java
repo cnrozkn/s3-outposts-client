@@ -72,6 +72,19 @@ class KeyScanTest {
     }
 
     @Test
+    void folderMarkerObjectsAreNotListedAsFiles() {
+        s3.add("docs/", "docs/a.txt", "docs/sub/", "docs/sub/x.txt");
+
+        ObjectPage docs = page("docs/", "", null, 10).page();
+        ObjectPage sub = page("docs/sub/", "", null, 10).page();
+
+        assertThat(docs.folders()).extracting(Folder::name).containsExactly("sub");
+        assertThat(docs.files()).extracting(FileEntry::name).containsExactly("a.txt");
+        assertThat(sub.folders()).isEmpty();
+        assertThat(sub.files()).extracting(FileEntry::name).containsExactly("x.txt");
+    }
+
+    @Test
     void pagesThroughFilesInOrder() {
         for (int i = 0; i < 250; i++) {
             s3.add("f%03d".formatted(i));

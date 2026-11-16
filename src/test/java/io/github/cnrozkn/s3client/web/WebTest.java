@@ -1,5 +1,6 @@
 package io.github.cnrozkn.s3client.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,8 +29,11 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -45,7 +49,7 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 @SpringBootTest(
         properties = {
             "S3CLIENT_USERNAME=admin",
-            "S3CLIENT_PASSWORD=secret",
+            "S3CLIENT_PASSWORD=test-password-0123",
             "management.server.port=",
             "s3-client.region=eu-west-1",
             "s3-client.upload-max-size=10B",
@@ -56,6 +60,7 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
             "s3-client.buckets[1].capabilities=LIST,DETAIL,DOWNLOAD,PREVIEW,VERSIONS,UPLOAD,DELETE"
         })
 @AutoConfigureMockMvc
+@ExtendWith(OutputCaptureExtension.class)
 class WebTest {
 
     @Autowired
@@ -165,6 +170,19 @@ class WebTest {
                 .andExpect(status().isNoContent());
 
         verify(storage).put(eq("rw--op-s3"), eq("docs/a.txt"), any(InputStream.class), eq(5L), eq("text/plain"));
+    }
+
+    @Test
+    @WithMockUser
+    void keysCannotAddLinesToTheAuditLog(CapturedOutput output) throws Exception {
+        mvc.perform(post("/buckets/rw/upload")
+                        .param("key", "a.txt\naction=delete key=forged")
+                        .content("hello")
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .with(csrf()))
+                .andExpect(status().isNoContent());
+
+        assertThat(output).contains("key=a.txt_action=delete key=forged").doesNotContain("\naction=delete");
     }
 
     @Test

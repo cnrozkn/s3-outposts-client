@@ -180,6 +180,10 @@ final class KeyScan {
             if (skipping != null && object.key().startsWith(skipping)) {
                 continue;
             }
+            // The empty marker object a console or "New folder" creates is the folder itself, not an entry in it.
+            if (object.key().equals(prefix) && prefix.endsWith("/")) {
+                continue;
+            }
             String folder = folderOf(object.key());
             skipping = folder;
             cursor = folder == null ? object.key() : folder + AFTER_ALL;

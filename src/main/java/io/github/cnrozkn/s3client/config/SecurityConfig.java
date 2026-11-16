@@ -1,5 +1,6 @@
 package io.github.cnrozkn.s3client.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -12,8 +13,16 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration(proxyBeanMethods = false)
 class SecurityConfig {
 
+    static final int MIN_PASSWORD_LENGTH = 16;
+
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(
+            HttpSecurity http, @Value("${spring.security.user.password}") String password) throws Exception {
+        // One shared password guards every bucket and login attempts are not throttled, so it has to be long.
+        if (password.length() < MIN_PASSWORD_LENGTH) {
+            throw new IllegalStateException(
+                    "S3CLIENT_PASSWORD must have at least " + MIN_PASSWORD_LENGTH + " characters");
+        }
         return http.authorizeHttpRequests(requests -> requests.requestMatchers(
                                 "/css/**",
                                 "/js/**",
