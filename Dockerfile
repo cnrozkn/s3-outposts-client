@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # The jar is the same on every architecture, so it is built once, natively, on the build machine.
-FROM --platform=$BUILDPLATFORM eclipse-temurin:21-jdk AS build
+FROM --platform=$BUILDPLATFORM eclipse-temurin:25-jdk AS build
 WORKDIR /src
 COPY .mvn/ .mvn/
 COPY mvnw pom.xml ./
@@ -11,7 +11,7 @@ RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -q package -DskipTests \
     && cp target/s3-outposts-client-*.jar /app.jar
 
 # No RUN step here: a multi-architecture build then needs no emulation for this stage.
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:25-jre
 WORKDIR /app
 COPY --from=build /app.jar app.jar
 USER 10001:10001
