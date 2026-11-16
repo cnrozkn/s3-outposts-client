@@ -15,3 +15,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # The project targets Java 21 (pom.xml, CI and both Dockerfile stages); move them together, by hand.
+      - dependency-name: eclipse-temurin
+        update-types: ["version-update:semver-major"]
