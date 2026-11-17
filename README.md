@@ -223,6 +223,9 @@ A proxy in front of the app needs a few settings for large uploads; see
 - Turn on writes only for the buckets that need them, and keep the IAM policy as narrow as the capabilities.
 - Previews are sent with `Content-Security-Policy: sandbox`, and markup types are shown as plain text, so a
   stored page cannot run script in your session.
+- Images released after v0.1.2 carry a signed build provenance attestation and an SBOM. To check that an image
+  was built from this repository:
+  `gh attestation verify oci://ghcr.io/cnrozkn/s3-outposts-client:<version> --owner cnrozkn`
 - To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ## Build from source
