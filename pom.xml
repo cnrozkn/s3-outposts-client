@@ -13,7 +13,7 @@
 
     <groupId>io.github.cnrozkn</groupId>
     <artifactId>s3-outposts-client</artifactId>
-    <version>0.1.1</version>
+    <version>0.1.2</version>
     <name>s3-outposts-client</name>
     <description>Web UI for Amazon S3 on Outposts: read-only by default, with optional per-bucket upload, delete and rename</description>
     <url>https://github.com/cnrozkn/s3-outposts-client</url>
