@@ -21,7 +21,7 @@ spring:
             paths: /css/**,/js/**
 
 server:
-  # Page tokens travel in the URL; deep paging through a large folder needs more than the 8 KB default.
+  # Page links carry up to 20 page tokens in the URL; with long keys that is more than the 8 KB default.
   max-http-request-header-size: 64KB
   compression:
     enabled: true

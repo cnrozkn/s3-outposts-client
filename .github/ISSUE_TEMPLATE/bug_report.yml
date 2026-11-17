@@ -1,0 +1,34 @@
+name: Bug report
+description: Something does not work as the README describes
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Remove access point aliases, ARNs, account IDs and credentials before you paste logs or settings.
+        For a security problem, do not open an issue: see the [security policy](https://github.com/cnrozkn/s3-outposts-client/security/policy).
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Image tag or commit, for example 0.1.1
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead
+    validations:
+      required: true
+  - type: textarea
+    id: setup
+    attributes:
+      label: Setup
+      description: How the app runs (Docker, Kubernetes, the proxy in front of it) and the settings you changed
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: The app log around the error, with the S3 error code if the page shows one
+      render: text

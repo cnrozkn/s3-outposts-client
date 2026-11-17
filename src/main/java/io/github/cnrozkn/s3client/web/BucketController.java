@@ -18,6 +18,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.MediaTypeFactory;
@@ -40,6 +41,9 @@ public class BucketController {
     /** One byte range; multi-range requests get the whole object, as S3 does not serve them either. */
     private static final Pattern SINGLE_RANGE = Pattern.compile("bytes=(\\d+-\\d*|-\\d+)");
 
+    /** Page links carry at most this many tokens, so the URL stays short; Previous further back goes to page 1. */
+    private static final int MAX_TOKENS = 20;
+
     private final BucketStorage storage;
     private final ClientProperties properties;
 
@@ -60,7 +64,7 @@ public class BucketController {
     }
 
     /**
-     * Each page link carries the tokens of all earlier pages in {@code t}, so Previous works without server state.
+     * Each page link carries the tokens of the earlier pages in {@code t}, so Previous works without server state.
      */
     @GetMapping("/buckets/{name}")
     public String objects(
@@ -87,6 +91,7 @@ public class BucketController {
                 page.nextToken() == null
                         ? null
                         : Stream.concat(tokens.stream(), Stream.of(page.nextToken()))
+                                .skip(Math.max(0, tokens.size() + 1 - MAX_TOKENS))
                                 .toList());
         model.addAttribute("uploadMaxSize", properties.uploadMaxSize().toBytes());
         return "browser";
@@ -134,8 +139,8 @@ public class BucketController {
     }
 
     /**
-     * Streams the object. A single {@code Range} is passed to S3, so interrupted downloads can resume. Conditional
-     * headers are not forwarded: S3 on Outposts rejects conditional requests.
+     * Streams the object. A single {@code Range} is passed to S3, so interrupted downloads can resume. S3 on Outposts
+     * rejects conditional requests, so {@code If-Range} is checked here.
      */
     @GetMapping("/buckets/{name}/download")
     public void download(
@@ -143,6 +148,8 @@ public class BucketController {
             @RequestParam String key,
             @RequestParam(required = false) String version,
             @RequestHeader(value = HttpHeaders.RANGE, required = false) String range,
+            @RequestHeader(value = HttpHeaders.IF_RANGE, required = false) String ifRange,
+            HttpMethod method,
             HttpServletResponse response)
             throws IOException {
         Bucket bucket = Access.require(properties, name, Capability.DOWNLOAD);
@@ -150,21 +157,45 @@ public class BucketController {
             Access.require(properties, name, Capability.VERSIONS);
         }
         String s3Range = range != null && SINGLE_RANGE.matcher(range.trim()).matches() ? range.trim() : null;
-        try (ResponseInputStream<GetObjectResponse> object = storage.open(bucket.alias(), key, version, s3Range)) {
+        try (ResponseInputStream<GetObjectResponse> object = open(bucket, key, version, s3Range, ifRange)) {
             response.setHeader(HttpHeaders.ACCEPT_RANGES, "bytes");
+            // Browsers resume a download only when it came with a validator, and send it back in If-Range.
+            response.setHeader(HttpHeaders.ETAG, object.response().eTag());
+            if (object.response().lastModified() != null) {
+                response.setDateHeader(
+                        HttpHeaders.LAST_MODIFIED,
+                        object.response().lastModified().toEpochMilli());
+            }
             String contentRange = object.response().contentRange();
             if (s3Range != null && contentRange != null) {
                 response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
                 response.setHeader(HttpHeaders.CONTENT_RANGE, contentRange);
             }
             response.setContentType(MediaType.APPLICATION_OCTET_STREAM_VALUE);
-            stream(object, ContentDisposition.attachment(), key, response);
+            stream(object, ContentDisposition.attachment(), key, method, response);
         }
+    }
+
+    /**
+     * With {@code If-Range} the range applies only while the object has the ETag the client got with its first part.
+     * Otherwise the client gets the whole current object, not a piece of it to splice onto the older bytes.
+     */
+    private ResponseInputStream<GetObjectResponse> open(
+            Bucket bucket, String key, String version, String range, String ifRange) {
+        ResponseInputStream<GetObjectResponse> object = storage.open(bucket.alias(), key, version, range);
+        if (range == null
+                || ifRange == null
+                || ifRange.trim().equals(object.response().eTag())) {
+            return object;
+        }
+        object.abort();
+        return storage.open(bucket.alias(), key, version, null);
     }
 
     /** Opens images, PDFs and text in the browser, sandboxed so a stored page cannot run script. */
     @GetMapping("/buckets/{name}/preview")
-    public void preview(@PathVariable String name, @RequestParam String key, HttpServletResponse response)
+    public void preview(
+            @PathVariable String name, @RequestParam String key, HttpMethod method, HttpServletResponse response)
             throws IOException {
         Bucket bucket = Access.require(properties, name, Capability.PREVIEW);
         try (ResponseInputStream<GetObjectResponse> object = storage.open(bucket.alias(), key, null, null)) {
@@ -178,7 +209,7 @@ public class BucketController {
             }
             response.setContentType(type.toString());
             response.setHeader("Content-Security-Policy", "sandbox");
-            stream(object, ContentDisposition.inline(), key, response);
+            stream(object, ContentDisposition.inline(), key, method, response);
         }
     }
 
@@ -234,6 +265,7 @@ public class BucketController {
             ResponseInputStream<GetObjectResponse> object,
             ContentDisposition.Builder disposition,
             String key,
+            HttpMethod method,
             HttpServletResponse response)
             throws IOException {
         Long length = object.response().contentLength();
@@ -247,6 +279,10 @@ public class BucketController {
                         .filename(fileName.isEmpty() ? "object" : fileName, StandardCharsets.UTF_8)
                         .build()
                         .toString());
+        if (HttpMethod.HEAD.equals(method)) {
+            object.abort(); // a HEAD answer has no body; reading it would still pull the whole object from S3
+            return;
+        }
         try {
             object.transferTo(response.getOutputStream());
         } catch (IOException e) {

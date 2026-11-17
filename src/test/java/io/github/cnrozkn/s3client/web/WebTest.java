@@ -12,9 +12,11 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -28,6 +30,9 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -124,6 +129,21 @@ class WebTest {
 
     @Test
     @WithMockUser
+    void pageLinksKeepOnlyTheNewestTokens() throws Exception {
+        List<String> tokens = IntStream.range(0, 20).mapToObj(i -> "F" + i).toList();
+        when(storage.list(any(), any(), any(), any()))
+                .thenReturn(new ObjectPage(List.of(), List.of(), "Fnext", false, false));
+
+        mvc.perform(get("/buckets/rw").param("t", tokens.toArray(String[]::new)))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute(
+                                "nextTokens",
+                                Stream.concat(tokens.stream().skip(1), Stream.of("Fnext"))
+                                        .toList()));
+    }
+
+    @Test
+    @WithMockUser
     void readPagesRejectOtherMethods() throws Exception {
         mvc.perform(delete("/buckets/rw").with(csrf())).andExpect(status().isMethodNotAllowed());
     }
@@ -182,7 +202,9 @@ class WebTest {
                         .with(csrf()))
                 .andExpect(status().isNoContent());
 
-        assertThat(output).contains("key=a.txt_action=delete key=forged").doesNotContain("\naction=delete");
+        assertThat(output)
+                .contains("action=upload user=user ip=127.0.0.1 bucket=rw key=a.txt_action=delete key=forged")
+                .doesNotContain("\naction=delete");
     }
 
     @Test
@@ -242,14 +264,61 @@ class WebTest {
     @Test
     @WithMockUser
     void singleRangesGetPartialContent() throws Exception {
+        Instant modified = Instant.parse("2026-03-04T05:06:07Z");
         when(storage.open("rw--op-s3", "a.bin", null, "bytes=0-3"))
-                .thenReturn(object("abcd", GetObjectResponse.builder().contentRange("bytes 0-3/10")));
+                .thenReturn(object(
+                        "abcd",
+                        GetObjectResponse.builder()
+                                .contentRange("bytes 0-3/10")
+                                .eTag("\"v1\"")
+                                .lastModified(modified)));
 
-        mvc.perform(get("/buckets/rw/download").param("key", "a.bin").header("Range", "bytes=0-3"))
+        mvc.perform(get("/buckets/rw/download")
+                        .param("key", "a.bin")
+                        .header("Range", "bytes=0-3")
+                        .header("If-Range", "\"v1\""))
                 .andExpect(status().isPartialContent())
                 .andExpect(header().string("Content-Range", "bytes 0-3/10"))
                 .andExpect(header().string("Accept-Ranges", "bytes"))
+                .andExpect(header().string("ETag", "\"v1\""))
+                .andExpect(header().dateValue("Last-Modified", modified.toEpochMilli()))
                 .andExpect(content().string("abcd"));
+    }
+
+    @Test
+    @WithMockUser
+    void aResumeAfterTheObjectChangedGetsTheWholeNewObject() throws Exception {
+        when(storage.open("rw--op-s3", "a.bin", null, "bytes=4-"))
+                .thenReturn(object(
+                        "efghij",
+                        GetObjectResponse.builder().contentRange("bytes 4-9/10").eTag("\"v2\"")));
+        when(storage.open("rw--op-s3", "a.bin", null, null))
+                .thenReturn(object("ABCDEFGHIJ", GetObjectResponse.builder().eTag("\"v2\"")));
+
+        mvc.perform(get("/buckets/rw/download")
+                        .param("key", "a.bin")
+                        .header("Range", "bytes=4-")
+                        .header("If-Range", "\"v1\""))
+                .andExpect(status().isOk())
+                .andExpect(header().doesNotExist("Content-Range"))
+                .andExpect(header().string("ETag", "\"v2\""))
+                .andExpect(content().string("ABCDEFGHIJ"));
+    }
+
+    @Test
+    @WithMockUser
+    void headDoesNotReadTheObject() throws Exception {
+        AtomicBoolean aborted = new AtomicBoolean();
+        when(storage.open("rw--op-s3", "a.bin", null, null))
+                .thenReturn(new ResponseInputStream<>(
+                        GetObjectResponse.builder().contentLength(10L).build(),
+                        AbortableInputStream.create(InputStream.nullInputStream(), () -> aborted.set(true))));
+
+        mvc.perform(head("/buckets/rw/download").param("key", "a.bin"))
+                .andExpect(status().isOk())
+                .andExpect(header().longValue("Content-Length", 10));
+
+        assertThat(aborted).isTrue();
     }
 
     @Test

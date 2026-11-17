@@ -17,7 +17,7 @@ import org.springframework.util.unit.DataSize;
  * Settings under {@code s3-client.*}. Each one can also be set as an environment variable, for example
  * {@code S3CLIENT_REGION} or {@code S3CLIENT_BUCKETS_0_ALIAS}.
  *
- * @param endpoint S3 on Outposts endpoint; when empty the SDK derives it from the access point alias and region
+ * @param endpoint custom endpoint; the SDK uses it only with an access point ARN and ignores it with an alias
  * @param region Region the Outpost is homed to; when empty the SDK default region chain applies ({@code AWS_REGION})
  * @param pageSize entries per listing page
  * @param previewMaxSize largest object the browser preview opens
@@ -26,7 +26,9 @@ import org.springframework.util.unit.DataSize;
  * @param listCacheTtl how long a listing page is reused; zero turns the cache off
  * @param buckets buckets shown in the UI, each reached through an access point alias or ARN
  */
-@ConfigurationProperties("s3-client")
+// No dash in the prefix: with "s3-client" Spring Boot reads S3_CLIENT_PAGE_SIZE, not S3CLIENT_PAGE_SIZE. YAML keys
+// under s3-client still bind, because property names are matched without their dashes.
+@ConfigurationProperties("s3client")
 public record ClientProperties(
         URI endpoint,
         String region,

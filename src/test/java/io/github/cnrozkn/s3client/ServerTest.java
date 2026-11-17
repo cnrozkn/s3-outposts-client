@@ -7,13 +7,17 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import org.apache.catalina.Context;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.boot.test.web.server.LocalManagementPort;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.boot.tomcat.TomcatWebServer;
+import org.springframework.boot.web.server.context.WebServerApplicationContext;
 
 /** Runs the real server: compression, static caching, and the open probe endpoints on the management port. */
 @SpringBootTest(
@@ -33,6 +37,9 @@ class ServerTest {
 
     @LocalManagementPort
     private int managementPort;
+
+    @Autowired
+    private WebServerApplicationContext context;
 
     private final HttpClient http = HttpClient.newHttpClient();
 
@@ -70,6 +77,14 @@ class ServerTest {
         assertThat(response.statusCode()).isEqualTo(302);
         assertThat(response.headers().firstValue("Location"))
                 .hasValueSatisfying(value -> assertThat(value).endsWith("/login"));
+    }
+
+    @Test
+    void aRunningRequestKeepsItsSession() {
+        Context app = (Context)
+                ((TomcatWebServer) context.getWebServer()).getTomcat().getHost().findChildren()[0];
+
+        assertThat(app.getManager().getSessionActivityCheck()).isTrue();
     }
 
     @Test

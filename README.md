@@ -7,6 +7,10 @@ A web UI for **Amazon S3 on Outposts**. It is read-only by default, and upload, 
 on per bucket. It is a web application, not an SDK: run the container next to your Outpost and open it in a
 browser.
 
+This is an independent project, not affiliated with or endorsed by Amazon Web Services.
+
+![A folder in a read-write bucket, with the details of one object in the side panel](docs/screenshot.png)
+
 ## Why
 
 The AWS Management Console cannot browse objects on an Outpost, and most generic S3 browsers fail against it:
@@ -23,7 +27,7 @@ The AWS Management Console cannot browse objects on an Outpost, and most generic
 ## Features
 
 - Browse buckets and folders, search by prefix, see object details, metadata, versions and delete markers
-- Download, with HTTP range support so interrupted downloads resume and large PDFs and videos open part by part
+- Download, with HTTP range support so interrupted downloads resume
 - Preview images, PDFs and text (sandboxed; SVG, HTML, JSON and XML are shown as plain text)
 - Optional per bucket: upload, replace (upload over an existing key), create folder, rename or move, delete
 - Stays responsive on large buckets: request and time budget per page, a short listing cache, folder jumps
@@ -64,12 +68,13 @@ Every setting is an environment variable or a key under `s3-client` in a YAML fi
 | `S3CLIENT_BUCKETS_<n>_ALIAS` | required | Access point alias (`…--op-s3`) or access point ARN. |
 | `S3CLIENT_BUCKETS_<n>_CAPABILITIES` | `LIST,DETAIL,DOWNLOAD,PREVIEW,VERSIONS` | Allowed operations, comma-separated. Add `UPLOAD` (upload, replace, create folder) and `DELETE` to allow writes. Rename needs both. |
 | `S3CLIENT_REGION` | SDK default (`AWS_REGION`) | Region the Outpost is homed to. |
-| `S3CLIENT_ENDPOINT` | derived from the alias | Only for a custom endpoint, for example `https://s3-outposts.<region>.amazonaws.com`. |
+| `S3CLIENT_ENDPOINT` | derived from the access point | Custom endpoint, used by the SDK only with an access point ARN: requests then go to `https://<access point>-<account>.<outpost id>.<endpoint host>`. With an alias the SDK ignores it. |
 | `S3CLIENT_PAGE_SIZE` | `100` | Entries per page, 1 to 1000. |
 | `S3CLIENT_PREVIEW_MAX_SIZE` | `5MB` | Largest object the preview opens. |
 | `S3CLIENT_UPLOAD_MAX_SIZE` | `5GB` | Largest upload; 5 GB is the single PUT limit. |
 | `S3CLIENT_WRITE_TIMEOUT` | `2h` | Time limit for one upload, copy or delete call. A 5 GB upload over a slow link needs most of it. |
 | `S3CLIENT_LIST_CACHE_TTL` | `30s` | How long a listing page is reused. `0` turns the cache off. |
+| `SERVER_SERVLET_SESSION_TIMEOUT` | `30m` | How long a login lasts without requests. A running upload or download keeps it. |
 | `LOGGING_STRUCTURED_FORMAT_CONSOLE` | plain text | `ecs` or `logstash` for JSON logs. |
 | `TZ` | `UTC` in the container | Time zone of the timestamps in the UI. |
 
@@ -89,9 +94,9 @@ s3-client:
 
 ### Credentials
 
-The app uses the AWS SDK default credential chain: environment variables, a shared profile, an EC2 instance
-profile, an ECS task role or EKS Pod Identity. IAM roles for service accounts (IRSA) need the
-`software.amazon.awssdk:sts` module, which is not bundled.
+The app uses the AWS SDK default credential chain: environment variables, IAM roles for service accounts (IRSA),
+a shared profile, an ECS task role or EKS Pod Identity, and an EC2 instance profile. Which of these an EKS
+cluster on an Outpost supports depends on the cluster type; see the EKS documentation for local clusters.
 
 ### IAM permissions
 
@@ -132,6 +137,27 @@ requests.
 ```
 
 Rename copies the object's tags, which is why the write statement includes the tagging actions.
+
+### Behind a reverse proxy
+
+- **TLS at the proxy.** Set `SERVER_FORWARD_HEADERS_STRATEGY=native` so the app reads `X-Forwarded-Proto` and
+  `X-Forwarded-For`. Without it, redirects such as the one to the login page point to `http://`, and the audit
+  log shows the proxy's address instead of the user's. Set it only when clients can reach the app through the
+  proxy alone: a client that reaches it directly could send its own forwarded headers. On Kubernetes, Spring
+  Boot turns it on by itself.
+- **Uploads.** nginx refuses request bodies over 1 MB by default, and it writes each body to its disk before it
+  passes it on. While it then forwards a large file, the browser waits with nothing to send, and a load balancer
+  in front with a 60 second idle timeout cuts the upload. Raise the limit and turn buffering off:
+
+  ```nginx
+  client_max_body_size 5g;
+  proxy_request_buffering off;
+  ```
+
+  With ingress-nginx, use the annotations `nginx.ingress.kubernetes.io/proxy-body-size: "5g"` and
+  `nginx.ingress.kubernetes.io/proxy-request-buffering: "off"`.
+- **Long links.** Page links carry the position of up to 20 earlier pages. With long keys, a link can pass the
+  8 KB that nginx allows for a request line; raise it with `large_client_header_buffers 4 32k;`.
 
 ## Performance and limits
 
@@ -174,7 +200,9 @@ time aws s3api list-objects-v2 --bucket '<alias>' --prefix '<large-folder>/' --m
 ## Writes
 
 Writes are off unless a bucket lists `UPLOAD` or `DELETE`. Each one needs a CSRF token and is logged on the
-`s3client.audit` logger as `action=… user=… bucket=… key=…`.
+`s3client.audit` logger as `action=… user=… ip=… bucket=… key=…`. Everyone shares one login, so the address
+is what tells people apart; behind a proxy it needs forwarded headers, see
+[Behind a reverse proxy](#behind-a-reverse-proxy).
 
 - **Upload and replace.** The browser sends the file as the raw request body, and the app streams it into
   PutObject, so the file is never written to disk. The limit is 5 GB per file, the single PUT limit. Before
@@ -184,8 +212,8 @@ Writes are off unless a bucket lists `UPLOAD` or `DELETE`. Each one needs a CSRF
   the source stays, and if the delete fails both keys exist. Objects over 5 GB cannot be renamed.
 - **Delete** removes one object. With versioning on, S3 adds a delete marker and keeps the older versions.
 
-A long upload also needs every proxy and load balancer in front of the app to allow it: an idle timeout of
-60 seconds cuts large uploads.
+A proxy in front of the app needs a few settings for large uploads; see
+[Behind a reverse proxy](#behind-a-reverse-proxy).
 
 ## Security notes
 

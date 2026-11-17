@@ -98,6 +98,8 @@
     const url = new URL(actions.existsUrl, location.href);
     url.searchParams.set('key', key);
     const response = await fetch(url, { headers: { Accept: 'application/json' } });
+    // An expired session redirects to the login page, which answers 200 with HTML.
+    if (response.redirected) throw new Error('the session expired, reload the page to sign in again');
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return (await response.json()).exists;
   }

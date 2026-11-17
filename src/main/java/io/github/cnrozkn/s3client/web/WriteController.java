@@ -7,7 +7,6 @@ import io.github.cnrozkn.s3client.storage.BucketStorage;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.security.Principal;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,8 +48,7 @@ public class WriteController {
             @PathVariable String name,
             @RequestParam String key,
             @RequestParam(defaultValue = "false") boolean overwrite,
-            HttpServletRequest request,
-            Principal principal)
+            HttpServletRequest request)
             throws IOException {
         Bucket bucket = Access.require(properties, name, Capability.UPLOAD);
         checkKey(key);
@@ -79,8 +77,9 @@ public class WriteController {
                 length,
                 contentType == null ? MediaType.APPLICATION_OCTET_STREAM_VALUE : contentType);
         audit.info(
-                "action=upload user={} bucket={} key={} size={} overwrite={}",
-                principal.getName(),
+                "action=upload user={} ip={} bucket={} key={} size={} overwrite={}",
+                request.getRemoteUser(),
+                request.getRemoteAddr(),
                 bucket.name(),
                 logged(key),
                 length,
@@ -93,7 +92,7 @@ public class WriteController {
             @PathVariable String name,
             @RequestParam(defaultValue = "") String prefix,
             @RequestParam String folder,
-            Principal principal,
+            HttpServletRequest request,
             RedirectAttributes redirect) {
         Bucket bucket = Access.require(properties, name, Capability.UPLOAD);
         if (folder.isEmpty() || folder.contains("/")) {
@@ -102,7 +101,12 @@ public class WriteController {
         String key = prefix + folder + "/";
         checkKey(key);
         storage.createFolder(bucket.alias(), key);
-        audit.info("action=create-folder user={} bucket={} key={}", principal.getName(), bucket.name(), logged(key));
+        audit.info(
+                "action=create-folder user={} ip={} bucket={} key={}",
+                request.getRemoteUser(),
+                request.getRemoteAddr(),
+                bucket.name(),
+                logged(key));
         redirect.addFlashAttribute("message", "Created folder " + folder);
         redirect.addAttribute("prefix", prefix);
         return "redirect:/buckets/{name}";
@@ -114,7 +118,7 @@ public class WriteController {
             @RequestParam String key,
             @RequestParam String target,
             @RequestParam(defaultValue = "false") boolean overwrite,
-            Principal principal,
+            HttpServletRequest request,
             RedirectAttributes redirect) {
         Bucket bucket = Access.require(properties, name, Capability.UPLOAD, Capability.DELETE);
         checkKey(key);
@@ -130,8 +134,9 @@ public class WriteController {
         }
         storage.move(bucket.alias(), key, target);
         audit.info(
-                "action=rename user={} bucket={} key={} target={} overwrite={}",
-                principal.getName(),
+                "action=rename user={} ip={} bucket={} key={} target={} overwrite={}",
+                request.getRemoteUser(),
+                request.getRemoteAddr(),
                 bucket.name(),
                 logged(key),
                 logged(target),
@@ -146,12 +151,17 @@ public class WriteController {
             @PathVariable String name,
             @RequestParam String key,
             @RequestParam(defaultValue = "") String prefix,
-            Principal principal,
+            HttpServletRequest request,
             RedirectAttributes redirect) {
         Bucket bucket = Access.require(properties, name, Capability.DELETE);
         checkKey(key);
         storage.delete(bucket.alias(), key);
-        audit.info("action=delete user={} bucket={} key={}", principal.getName(), bucket.name(), logged(key));
+        audit.info(
+                "action=delete user={} ip={} bucket={} key={}",
+                request.getRemoteUser(),
+                request.getRemoteAddr(),
+                bucket.name(),
+                logged(key));
         redirect.addFlashAttribute("message", "Deleted " + key);
         redirect.addAttribute("prefix", prefix);
         return "redirect:/buckets/{name}";
